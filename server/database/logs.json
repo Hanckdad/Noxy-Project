@@ -1,0 +1,29 @@
+[
+  {
+    "id": "log_001",
+    "type": "user_registration",
+    "userId": "1736937940167",
+    "action": "user_created",
+    "details": "Admin user created via initialization",
+    "timestamp": "2024-01-15T08:00:00.000Z",
+    "ipAddress": "system"
+  },
+  {
+    "id": "log_002",
+    "type": "user_login",
+    "userId": "1736937940168",
+    "action": "login_success",
+    "details": "User 'bayu' logged in successfully",
+    "timestamp": "2024-01-20T14:45:00.000Z",
+    "ipAddress": "192.168.1.100"
+  },
+  {
+    "id": "log_003",
+    "type": "chat_created",
+    "userId": "1736937940168",
+    "action": "new_chat",
+    "details": "Created chat 'Tentang Noxy AI'",
+    "timestamp": "2024-01-15T10:30:00.000Z",
+    "ipAddress": "192.168.1.100"
+  }
+]
