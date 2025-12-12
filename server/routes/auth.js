@@ -2,334 +2,350 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const database = require('../database/index');
+const fs = require('fs').promises;
+const path = require('path');
 
-// Register route
+const usersFilePath = path.join(__dirname, '../database/users.json');
+
+// Ensure database exists
+async function ensureDatabase() {
+    try {
+        await fs.mkdir(path.dirname(usersFilePath), { recursive: true });
+        try {
+            await fs.access(usersFilePath);
+        } catch {
+            await fs.writeFile(usersFilePath, JSON.stringify([]));
+            console.log('📁 Created users.json');
+        }
+    } catch (error) {
+        console.error('Database setup error:', error);
+    }
+}
+
+// Read users from file
+async function readUsers() {
+    try {
+        await ensureDatabase();
+        const data = await fs.readFile(usersFilePath, 'utf8');
+        return JSON.parse(data || '[]');
+    } catch (error) {
+        console.error('Error reading users:', error);
+        return [];
+    }
+}
+
+// Write users to file
+async function writeUsers(users) {
+    try {
+        await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error writing users:', error);
+        return false;
+    }
+}
+
+// Generate JWT token
+function generateToken(user) {
+    return jwt.sign(
+        {
+            id: user.id,
+            username: user.username,
+            role: user.role || 'user'
+        },
+        process.env.JWT_SECRET || 'noxy-voldigoard-secret-key-2024-bayu-official',
+        { expiresIn: '7d' }
+    );
+}
+
+// Initialize default users if empty
+async function initDefaultUsers() {
+    const users = await readUsers();
+    
+    if (users.length === 0) {
+        console.log('👥 Creating default users...');
+        
+        const defaultUsers = [
+            {
+                id: Date.now().toString(),
+                username: 'admin',
+                email: 'admin@noxy.ai',
+                password: await bcrypt.hash('admin123', 10),
+                displayName: 'System Admin',
+                role: 'admin',
+                avatarColor: '#2563eb',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastLogin: null,
+                settings: {
+                    theme: 'light',
+                    language: 'en',
+                    notifications: true
+                }
+            },
+            {
+                id: (Date.now() + 1).toString(),
+                username: 'bayu',
+                email: 'bayu@official.com',
+                password: await bcrypt.hash('bayu123', 10),
+                displayName: 'Bayu Official',
+                role: 'creator',
+                avatarColor: '#dc2626',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastLogin: null,
+                settings: {
+                    theme: 'dark',
+                    language: 'id',
+                    notifications: true
+                }
+            }
+        ];
+        
+        await writeUsers(defaultUsers);
+        console.log('✅ Default users created');
+        console.log('🔑 Admin: username="admin", password="admin123"');
+        console.log('🔑 Creator: username="bayu", password="bayu123"');
+    }
+}
+
+// Call initialization
+initDefaultUsers();
+
+// REGISTER endpoint
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, password, displayName } = req.body;
+        const { username, password } = req.body;
 
-        if (!username || !password || !email) {
-            return res.status(400).json({ 
-                error: 'Username, email, and password are required' 
+        console.log('📝 Register attempt:', { username });
+
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username and password are required'
+            });
+        }
+
+        if (username.length < 3) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username must be at least 3 characters'
             });
         }
 
         if (password.length < 6) {
-            return res.status(400).json({ 
-                error: 'Password must be at least 6 characters' 
+            return res.status(400).json({
+                success: false,
+                error: 'Password must be at least 6 characters'
             });
         }
 
-        // Create user in database
-        const userData = {
-            username,
-            email,
-            password,
-            displayName: displayName || username
+        const users = await readUsers();
+
+        // Check if username already exists
+        if (users.some(user => user.username.toLowerCase() === username.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username already exists'
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create new user
+        const newUser = {
+            id: Date.now().toString(),
+            username: username.trim(),
+            email: `${username}@noxy.ai`, // Auto-generate email
+            password: hashedPassword,
+            displayName: username.trim(),
+            role: 'user',
+            avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16), // Random color
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastLogin: null,
+            settings: {
+                theme: 'light',
+                language: 'en',
+                notifications: true
+            }
         };
 
-        const user = await database.createUser(userData);
+        users.push(newUser);
+        await writeUsers(users);
 
-        // Generate JWT token
-        const token = jwt.sign(
-            { 
-                id: user.id, 
-                username: user.username,
-                role: user.role 
-            },
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024',
-            { expiresIn: '7d' }
-        );
+        console.log('✅ User registered:', username);
 
-        // Create session
-        const ipAddress = req.headers['x-forwarded-for'] || req.ip;
-        const userAgent = req.headers['user-agent'];
-        await database.createSession(user.id, token, ipAddress, userAgent);
+        // Generate token
+        const token = generateToken(newUser);
 
-        // Update last login
-        await database.updateUser(user.id, { lastLogin: new Date().toISOString() });
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = newUser;
 
         res.status(201).json({
             success: true,
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                displayName: user.displayName,
-                role: user.role,
-                avatarColor: user.avatarColor,
-                settings: user.settings
-            }
+            message: 'Registration successful',
+            token: token,
+            user: userWithoutPassword
         });
 
     } catch (error) {
-        console.error('Registration error:', error);
-        
-        if (error.message.includes('already exists')) {
-            return res.status(409).json({ error: error.message });
-        }
-        
-        res.status(500).json({ 
-            error: 'Registration failed',
-            details: error.message 
+        console.error('❌ Registration error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Registration failed. Please try again.'
         });
     }
 });
 
-// Login route
+// LOGIN endpoint
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        console.log('🔐 Login attempt:', { username });
+
         if (!username || !password) {
-            return res.status(400).json({ 
-                error: 'Username and password required' 
+            return res.status(400).json({
+                success: false,
+                error: 'Username and password are required'
             });
         }
 
-        // Find user
-        const user = await database.findUser({ username });
-        if (!user) {
-            await database.logAction('user_login', null, 'login_failed', {
-                username,
-                reason: 'User not found',
-                ipAddress: req.ip
-            });
-            
-            return res.status(401).json({ 
-                error: 'Invalid credentials' 
-            });
-        }
-
-        // Verify password
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-            await database.logAction('user_login', user.id, 'login_failed', {
-                username,
-                reason: 'Invalid password',
-                ipAddress: req.ip
-            });
-            
-            return res.status(401).json({ 
-                error: 'Invalid credentials' 
-            });
-        }
-
-        // Generate JWT token
-        const token = jwt.sign(
-            { 
-                id: user.id, 
-                username: user.username,
-                role: user.role 
-            },
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024',
-            { expiresIn: '7d' }
+        const users = await readUsers();
+        
+        // Find user by username
+        const user = users.find(u => 
+            u.username.toLowerCase() === username.toLowerCase()
         );
 
-        // Create session
-        const ipAddress = req.headers['x-forwarded-for'] || req.ip;
-        const userAgent = req.headers['user-agent'];
-        await database.createSession(user.id, token, ipAddress, userAgent);
+        if (!user) {
+            console.log('❌ User not found:', username);
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid username or password'
+            });
+        }
+
+        // Check password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        
+        if (!isPasswordValid) {
+            console.log('❌ Invalid password for user:', username);
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid username or password'
+            });
+        }
+
+        // Generate token
+        const token = generateToken(user);
 
         // Update last login
-        await database.updateUser(user.id, { 
-            lastLogin: new Date().toISOString() 
-        });
+        user.lastLogin = new Date().toISOString();
+        user.updatedAt = new Date().toISOString();
+        await writeUsers(users);
 
-        // Log successful login
-        await database.logAction('user_login', user.id, 'login_success', {
-            ipAddress: req.ip
-        });
+        console.log('✅ Login successful:', username);
 
         // Remove password from response
         const { password: _, ...userWithoutPassword } = user;
 
         res.json({
             success: true,
-            token,
+            message: 'Login successful',
+            token: token,
             user: userWithoutPassword
         });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ 
-            error: 'Login failed',
-            details: error.message 
+        console.error('❌ Login error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Login failed. Please try again.'
         });
     }
 });
 
-// Verify token route
+// VERIFY token endpoint
 router.get('/verify', async (req, res) => {
     try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
+        const authHeader = req.headers.authorization;
         
-        if (!token) {
-            return res.status(401).json({ 
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
                 success: false,
-                error: 'No token provided' 
+                error: 'No token provided'
             });
         }
 
-        // Verify JWT
+        const token = authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token format'
+            });
+        }
+
+        // Verify token
         const decoded = jwt.verify(
             token,
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-key-2024-bayu-official'
         );
 
-        // Check session
-        const session = await database.validateSession(token);
-        if (!session) {
-            return res.status(401).json({ 
-                success: false,
-                error: 'Session expired' 
-            });
-        }
+        // Get user from database
+        const users = await readUsers();
+        const user = users.find(u => u.id === decoded.id);
 
-        // Get user
-        const user = await database.findUser({ id: decoded.id });
         if (!user) {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                error: 'User not found' 
+                error: 'User not found'
             });
         }
 
+        // Remove password from response
         const { password, ...userWithoutPassword } = user;
-        
+
         res.json({
             success: true,
-            user: userWithoutPassword,
-            session: {
-                expiresAt: session.expiresAt,
-                createdAt: session.createdAt
-            }
+            user: userWithoutPassword
         });
 
     } catch (error) {
-        console.error('Token verification error:', error);
+        console.error('❌ Token verification error:', error);
         
         if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                error: 'Invalid token' 
+                error: 'Invalid token'
             });
         }
         
         if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ 
+            return res.status(401).json({
                 success: false,
-                error: 'Token expired' 
+                error: 'Token expired'
             });
         }
-        
-        res.status(500).json({ 
+
+        res.status(500).json({
             success: false,
-            error: 'Token verification failed' 
+            error: 'Token verification failed'
         });
     }
 });
 
-// Logout route
-router.post('/logout', async (req, res) => {
-    try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        
-        if (token) {
-            const sessions = await database.readFile('sessions.json');
-            const session = sessions.find(s => s.token === token);
-            
-            if (session) {
-                await database.deleteSession(session.sessionId);
-                
-                await database.logAction('user_logout', session.userId, 'logout', {
-                    ipAddress: req.ip
-                });
-            }
-        }
-
-        res.json({ 
-            success: true, 
-            message: 'Logged out successfully' 
-        });
-
-    } catch (error) {
-        console.error('Logout error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Logout failed' 
-        });
-    }
-});
-
-// Get user profile
-router.get('/profile', async (req, res) => {
-    try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
-        );
-
-        const user = await database.findUser({ id: decoded.id });
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const { password, ...userWithoutPassword } = user;
-        
-        res.json({
-            success: true,
-            profile: userWithoutPassword
-        });
-
-    } catch (error) {
-        console.error('Profile error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to get profile' 
-        });
-    }
-});
-
-// Update user settings
-router.put('/settings', async (req, res) => {
-    try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        const { settings } = req.body;
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
-        );
-
-        const updatedUser = await database.updateUser(decoded.id, { 
-            settings: settings 
-        });
-
-        res.json({
-            success: true,
-            settings: updatedUser.settings
-        });
-
-    } catch (error) {
-        console.error('Settings update error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to update settings' 
-        });
-    }
+// LOGOUT endpoint
+router.post('/logout', (req, res) => {
+    // Since we're using JWT stateless, just return success
+    // In production, you might want to implement a token blacklist
+    res.json({
+        success: true,
+        message: 'Logged out successfully'
+    });
 });
 
 module.exports = router;
