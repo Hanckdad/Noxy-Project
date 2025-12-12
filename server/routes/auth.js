@@ -2,89 +2,79 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const fs = require('fs').promises;
-const path = require('path');
-
-const usersFilePath = path.join(__dirname, '../database/users.json');
-
-// Ensure database directory exists
-async function ensureDatabase() {
-    try {
-        await fs.mkdir(path.dirname(usersFilePath), { recursive: true });
-        try {
-            await fs.access(usersFilePath);
-        } catch {
-            await fs.writeFile(usersFilePath, JSON.stringify([]));
-        }
-    } catch (error) {
-        console.error('Database setup error:', error);
-    }
-}
-
-// Read users from file
-async function readUsers() {
-    try {
-        await ensureDatabase();
-        const data = await fs.readFile(usersFilePath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading users:', error);
-        return [];
-    }
-}
-
-// Write users to file
-async function writeUsers(users) {
-    try {
-        await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2));
-    } catch (error) {
-        console.error('Error writing users:', error);
-    }
-}
-
-// Generate JWT token
-function generateToken(user) {
-    return jwt.sign(
-        { id: user.id, username: user.username },
-        process.env.JWT_SECRET || 'noxy-secret-key-2024',
-        { expiresIn: '7d' }
-    );
-}
+const database = require('../database/index');
 
 // Register route
 router.post('/register', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, email, password, displayName } = req.body;
 
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Username and password required' });
+        if (!username || !password || !email) {
+            return res.status(400).json({ 
+                error: 'Username, email, and password are required' 
+            });
         }
 
-        const users = await readUsers();
-
-        // Check if user exists
-        if (users.find(u => u.username === username)) {
-            return res.status(400).json({ error: 'Username already exists' });
+        if (password.length < 6) {
+            return res.status(400).json({ 
+                error: 'Password must be at least 6 characters' 
+            });
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create new user
-        const newUser = {
-            id: Date.now().toString(),
+        // Create user in database
+        const userData = {
             username,
-            password: hashedPassword,
-            createdAt: new Date().toISOString()
+            email,
+            password,
+            displayName: displayName || username
         };
 
-        users.push(newUser);
-        await writeUsers(users);
+        const user = await database.createUser(userData);
 
-        res.status(201).json({ message: 'Registration successful' });
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username,
+                role: user.role 
+            },
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024',
+            { expiresIn: '7d' }
+        );
+
+        // Create session
+        const ipAddress = req.headers['x-forwarded-for'] || req.ip;
+        const userAgent = req.headers['user-agent'];
+        await database.createSession(user.id, token, ipAddress, userAgent);
+
+        // Update last login
+        await database.updateUser(user.id, { lastLogin: new Date().toISOString() });
+
+        res.status(201).json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                displayName: user.displayName,
+                role: user.role,
+                avatarColor: user.avatarColor,
+                settings: user.settings
+            }
+        });
+
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        
+        if (error.message.includes('already exists')) {
+            return res.status(409).json({ error: error.message });
+        }
+        
+        res.status(500).json({ 
+            error: 'Registration failed',
+            details: error.message 
+        });
     }
 });
 
@@ -94,63 +84,251 @@ router.post('/login', async (req, res) => {
         const { username, password } = req.body;
 
         if (!username || !password) {
-            return res.status(400).json({ error: 'Username and password required' });
+            return res.status(400).json({ 
+                error: 'Username and password required' 
+            });
         }
 
-        const users = await readUsers();
-        const user = users.find(u => u.username === username);
-
+        // Find user
+        const user = await database.findUser({ username });
         if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            await database.logAction('user_login', null, 'login_failed', {
+                username,
+                reason: 'User not found',
+                ipAddress: req.ip
+            });
+            
+            return res.status(401).json({ 
+                error: 'Invalid credentials' 
+            });
         }
 
-        // Check password
+        // Verify password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            await database.logAction('user_login', user.id, 'login_failed', {
+                username,
+                reason: 'Invalid password',
+                ipAddress: req.ip
+            });
+            
+            return res.status(401).json({ 
+                error: 'Invalid credentials' 
+            });
         }
 
-        // Generate token
-        const token = generateToken(user);
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username,
+                role: user.role 
+            },
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024',
+            { expiresIn: '7d' }
+        );
 
-        // Return user data (without password)
+        // Create session
+        const ipAddress = req.headers['x-forwarded-for'] || req.ip;
+        const userAgent = req.headers['user-agent'];
+        await database.createSession(user.id, token, ipAddress, userAgent);
+
+        // Update last login
+        await database.updateUser(user.id, { 
+            lastLogin: new Date().toISOString() 
+        });
+
+        // Log successful login
+        await database.logAction('user_login', user.id, 'login_success', {
+            ipAddress: req.ip
+        });
+
+        // Remove password from response
         const { password: _, ...userWithoutPassword } = user;
+
         res.json({
+            success: true,
             token,
             user: userWithoutPassword
         });
+
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            error: 'Login failed',
+            details: error.message 
+        });
     }
 });
 
 // Verify token route
 router.get('/verify', async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const token = req.headers.authorization?.replace('Bearer ', '');
         
         if (!token) {
-            return res.status(401).json({ error: 'No token provided' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'No token provided' 
+            });
+        }
+
+        // Verify JWT
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
+        );
+
+        // Check session
+        const session = await database.validateSession(token);
+        if (!session) {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Session expired' 
+            });
+        }
+
+        // Get user
+        const user = await database.findUser({ id: decoded.id });
+        if (!user) {
+            return res.status(401).json({ 
+                success: false,
+                error: 'User not found' 
+            });
+        }
+
+        const { password, ...userWithoutPassword } = user;
+        
+        res.json({
+            success: true,
+            user: userWithoutPassword,
+            session: {
+                expiresAt: session.expiresAt,
+                createdAt: session.createdAt
+            }
+        });
+
+    } catch (error) {
+        console.error('Token verification error:', error);
+        
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Invalid token' 
+            });
+        }
+        
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Token expired' 
+            });
+        }
+        
+        res.status(500).json({ 
+            success: false,
+            error: 'Token verification failed' 
+        });
+    }
+});
+
+// Logout route
+router.post('/logout', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        
+        if (token) {
+            const sessions = await database.readFile('sessions.json');
+            const session = sessions.find(s => s.token === token);
+            
+            if (session) {
+                await database.deleteSession(session.sessionId);
+                
+                await database.logAction('user_logout', session.userId, 'logout', {
+                    ipAddress: req.ip
+                });
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Logged out successfully' 
+        });
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Logout failed' 
+        });
+    }
+});
+
+// Get user profile
+router.get('/profile', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        
+        if (!token) {
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
         const decoded = jwt.verify(
             token,
-            process.env.JWT_SECRET || 'noxy-secret-key-2024'
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
         );
 
-        const users = await readUsers();
-        const user = users.find(u => u.id === decoded.id);
-
+        const user = await database.findUser({ id: decoded.id });
         if (!user) {
-            return res.status(401).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found' });
         }
 
         const { password, ...userWithoutPassword } = user;
-        res.json(userWithoutPassword);
+        
+        res.json({
+            success: true,
+            profile: userWithoutPassword
+        });
+
     } catch (error) {
-        console.error('Token verification error:', error);
-        res.status(401).json({ error: 'Invalid token' });
+        console.error('Profile error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get profile' 
+        });
+    }
+});
+
+// Update user settings
+router.put('/settings', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        const { settings } = req.body;
+        
+        if (!token) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
+        );
+
+        const updatedUser = await database.updateUser(decoded.id, { 
+            settings: settings 
+        });
+
+        res.json({
+            success: true,
+            settings: updatedUser.settings
+        });
+
+    } catch (error) {
+        console.error('Settings update error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to update settings' 
+        });
     }
 });
 
