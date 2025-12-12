@@ -71,107 +71,50 @@
         </div>
     </div>
 
-    <!-- REPLACED LOGIN MODAL -->
+    <!-- Login Modal - SIMPLE CLEAN VERSION -->
     <div class="modal" id="loginModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><span class="modal-icon">🦇</span> Welcome to Noxy</h3>
+                <h3><span class="modal-icon">🦇</span> Login / Register</h3>
                 <button class="close-modal">&times;</button>
             </div>
 
             <div class="modal-body">
-                <!-- Tabs -->
-                <div class="auth-tabs">
-                    <button class="auth-tab active" id="loginTabBtn" data-tab="login">
+
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i> Username
+                    </label>
+                    <input type="text" 
+                           id="username" 
+                           placeholder="Enter username"
+                           autocomplete="username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i> Password
+                    </label>
+                    <input type="password" 
+                           id="password" 
+                           placeholder="Enter password"
+                           autocomplete="current-password">
+                </div>
+                
+                <div class="auth-buttons">
+                    <button class="btn-primary" id="loginBtnModal">
                         <i class="fas fa-sign-in-alt"></i> Login
                     </button>
-                    <button class="auth-tab" id="registerTabBtn" data-tab="register">
-                        <i class="fas fa-user-plus"></i> Register
-                    </button>
-                </div>
 
-                <!-- Login Form -->
-                <div class="auth-form active" id="loginForm">
-                    <div class="form-group">
-                        <label for="loginUsername"><i class="fas fa-user"></i> Username</label>
-                        <input type="text" id="loginUsername" placeholder="Enter username (admin / bayu)">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="loginPassword"><i class="fas fa-lock"></i> Password</label>
-                        <input type="password" id="loginPassword" placeholder="Enter password">
-                    </div>
-
-                    <button class="btn-primary btn-block" id="loginSubmitBtn">
-                        <i class="fas fa-sign-in-alt"></i> Login Now
-                    </button>
-
-                    <!-- Demo Accounts -->
-                    <div class="demo-section">
-                        <div class="demo-header">
-                            <i class="fas fa-vial"></i> Demo Accounts
-                        </div>
-
-                        <div class="demo-accounts">
-                            <div class="demo-account">
-                                <div class="demo-badge admin">ADMIN</div>
-                                <div class="demo-info">
-                                    <strong>admin</strong>
-                                    <small>password: admin123</small>
-                                </div>
-                                <button class="demo-use-btn" data-username="admin" data-password="admin123">
-                                    <i class="fas fa-play"></i> Use
-                                </button>
-                            </div>
-
-                            <div class="demo-account">
-                                <div class="demo-badge creator">CREATOR</div>
-                                <div class="demo-info">
-                                    <strong>bayu</strong>
-                                    <small>password: bayu123</small>
-                                </div>
-                                <button class="demo-use-btn" data-username="bayu" data-password="bayu123">
-                                    <i class="fas fa-play"></i> Use
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Register Form -->
-                <div class="auth-form" id="registerForm">
-                    <div class="form-group">
-                        <label for="registerUsername"><i class="fas fa-user"></i> Choose Username</label>
-                        <input type="text" id="registerUsername" placeholder="min. 3 characters">
-                        <div class="form-hint" id="usernameHint"></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="registerPassword"><i class="fas fa-lock"></i> Choose Password</label>
-                        <input type="password" id="registerPassword" placeholder="min. 6 characters">
-                        <div class="form-hint" id="passwordHint"></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="registerEmail"><i class="fas fa-envelope"></i> Email (Optional)</label>
-                        <input type="email" id="registerEmail" placeholder="you@example.com">
-                    </div>
-
-                    <button class="btn-primary btn-block" id="registerSubmitBtn">
+                    <button class="btn-secondary" id="registerBtnModal">
                         <i class="fas fa-user-plus"></i> Create Account
                     </button>
-
-                    <div class="register-info">
-                        <p><i class="fas fa-info-circle"></i> Your data is stored securely in our database</p>
-                        <p><i class="fas fa-shield-alt"></i> Password is encrypted with bcrypt</p>
-                    </div>
                 </div>
 
-                <div class="auth-footer">
-                    <p class="form-note">
-                        <i class="fas fa-database"></i> Data saved in <code>database/users.json</code>
-                    </p>
+                <div class="form-note">
+                    <p><i class="fas fa-info-circle"></i> Your password is stored securely</p>
                 </div>
+
             </div>
         </div>
     </div>
