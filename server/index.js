@@ -1,15 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
-
-// Import database
-const database = require('./database/index');
-
-// Import routes
-const authRoutes = require('./routes/auth');
-const chatRoutes = require('./routes/chat');
-const tiktokRoutes = require('./routes/tiktok');
 
 const app = express();
 
@@ -17,16 +8,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/tiktok', tiktokRoutes);
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/tiktok', require('./routes/tiktok'));
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
@@ -35,61 +24,29 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Database stats endpoint
-app.get('/api/stats', async (req, res) => {
-    try {
-        const stats = await database.getStats();
-        res.json({
-            success: true,
-            stats: stats
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Failed to get stats' 
-        });
-    }
-});
-
-// Serve frontend for all other routes
+// Serve frontend
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
-    console.error('Global error:', err.stack);
-    
-    const statusCode = err.status || 500;
-    const message = err.message || 'Internal Server Error';
-    
-    res.status(statusCode).json({
+    console.error('Server error:', err.stack);
+    res.status(500).json({ 
         success: false,
-        error: message,
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        error: 'Something went wrong!' 
     });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Route not found'
-    });
-});
+const PORT = process.env.PORT || 3000;
 
-// Start server only if not in Vercel environment
 if (require.main === module) {
-    const PORT = process.env.PORT || 3000;
-    
-    database.init().then(() => {
-        app.listen(PORT, () => {
-            console.log(`🦇 Noxy Voldigoard running on port ${PORT}`);
-            console.log(`👤 Author: Bayu Official`);
-            console.log(`🔗 http://localhost:${PORT}`);
-            console.log(`🌐 API: http://localhost:${PORT}/api/health`);
-        });
+    app.listen(PORT, () => {
+        console.log(`🦇 Noxy Voldigoard running on port ${PORT}`);
+        console.log(`👤 Author: Bayu Official`);
+        console.log(`🔗 http://localhost:${PORT}`);
+        console.log(`🌐 API Health: http://localhost:${PORT}/api/health`);
     });
 }
 
-// Export for Vercel
 module.exports = app;
