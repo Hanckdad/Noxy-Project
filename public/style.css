@@ -621,3 +621,69 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+/* Alert Messages */
+.alert-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 300px;
+    max-width: 400px;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.alert-success {
+    background-color: #10b981;
+    color: white;
+    border-left: 4px solid #059669;
+}
+
+.alert-error {
+    background-color: #ef4444;
+    color: white;
+    border-left: 4px solid #dc2626;
+}
+
+.alert-info {
+    background-color: #3b82f6;
+    color: white;
+    border-left: 4px solid #2563eb;
+}
+
+.alert-warning {
+    background-color: #f59e0b;
+    color: white;
+    border-left: 4px solid #d97706;
+}
+
+.alert-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    margin-left: 15px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.alert-close:hover {
+    opacity: 1;
+}
