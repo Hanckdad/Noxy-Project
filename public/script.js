@@ -12,50 +12,33 @@ class NoxyApp {
     }
 
     /* ---------------------------------------------------
-       INITIALIZE ELEMENTS
+       INITIALIZE UI ELEMENTS
     --------------------------------------------------- */
     initializeElements() {
-        console.log("🔧 Initializing elements...");
-
-        // Sidebar
         this.sidebar = document.querySelector(".sidebar");
         this.newChatBtn = document.getElementById("newChatBtn");
         this.chatHistory = document.getElementById("chatHistory");
         this.userInfo = document.getElementById("userInfo");
         this.loginBtn = document.getElementById("loginBtn");
 
-        // Main
         this.messageInput = document.getElementById("messageInput");
         this.sendBtn = document.getElementById("sendBtn");
         this.chatContainer = document.getElementById("chatContainer");
         this.currentChatTitle = document.getElementById("currentChatTitle");
 
-        // Modals
         this.loginModal = document.getElementById("loginModal");
         this.tiktokModal = document.getElementById("tiktokModal");
         this.settingsModal = document.getElementById("settingsModal");
+
         this.closeModalButtons = document.querySelectorAll(".close-modal");
 
-        // Login Modal (new)
         this.loginUsernameInput = document.getElementById("username");
         this.loginPasswordInput = document.getElementById("password");
         this.loginSubmitBtn = document.getElementById("loginBtnModal");
         this.registerBtn = document.getElementById("registerBtnModal");
 
-        // TikTok
-        this.tiktokUrlInput = document.getElementById("tiktokUrl");
-        this.downloadTikTokBtn = document.getElementById("downloadTikTokBtn");
-        this.tiktokResult = document.getElementById("tiktokResult");
-        this.videoPreview = document.getElementById("videoPreview");
-        this.downloadOptions = document.getElementById("downloadOptions");
-
-        // Buttons
-        this.tiktokDownloadBtn = document.getElementById("tiktokDownloadBtn");
         this.settingsBtn = document.getElementById("settingsBtn");
         this.logoutBtn = document.getElementById("logoutBtn");
-        this.attachBtn = document.getElementById("attachBtn");
-
-        console.log("✅ UI elements initialized!");
     }
 
     /* ---------------------------------------------------
@@ -69,18 +52,15 @@ class NoxyApp {
 
         this.newChatBtn?.addEventListener("click", () => this.createNewChat());
         this.loginBtn?.addEventListener("click", () => this.openModal(this.loginModal));
-        this.tiktokDownloadBtn?.addEventListener("click", () => this.openModal(this.tiktokModal));
         this.settingsBtn?.addEventListener("click", () => this.openModal(this.settingsModal));
         this.logoutBtn?.addEventListener("click", () => this.logout());
 
-        // Auth new
         this.loginSubmitBtn?.addEventListener("click", () => this.login());
         this.registerBtn?.addEventListener("click", () => this.register());
 
-        // Modal closing
-        this.closeModalButtons.forEach((btn) => {
-            btn.addEventListener("click", () => this.closeAllModals());
-        });
+        this.closeModalButtons.forEach((btn) =>
+            btn.addEventListener("click", () => this.closeAllModals())
+        );
 
         window.addEventListener("click", (e) => {
             if (e.target.classList.contains("modal")) this.closeAllModals();
@@ -93,7 +73,6 @@ class NoxyApp {
     loadFromLocalStorage() {
         const savedChats = localStorage.getItem("noxy_chats");
         if (savedChats) this.chats = JSON.parse(savedChats);
-
         this.renderChatHistory();
     }
 
@@ -113,26 +92,24 @@ class NoxyApp {
     }
 
     /* ---------------------------------------------------
-       AUTH FUNCTIONS
+       AUTH
     --------------------------------------------------- */
     async checkAuth() {
         const token = localStorage.getItem("noxy_token");
         if (!token) return;
 
         try {
-            const response = await fetch(`${this.baseURL}/api/auth/me`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const res = await fetch(`${this.baseURL}/api/auth/me`, {
+                headers: { Authorization: `Bearer ${token}` },
             });
-            const data = await response.json();
 
+            const data = await res.json();
             if (data.success) {
                 this.currentUser = data.user;
                 this.updateUI();
                 this.loadUserChats();
             }
-        } catch (err) {
-            console.log("Auth check failed");
-        }
+        } catch {}
     }
 
     async login() {
@@ -142,77 +119,59 @@ class NoxyApp {
         if (!username || !password)
             return this.showAlert("Please enter username and password", "error");
 
-        const btn = this.loginSubmitBtn;
-        const oldText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Logging in...`;
-
         try {
             const res = await fetch(`${this.baseURL}/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password }),
             });
 
             const data = await res.json();
 
-            if (!data.success) {
-                this.showAlert(data.error, "error");
-            } else {
+            if (data.success) {
                 localStorage.setItem("noxy_token", data.token);
                 this.currentUser = data.user;
                 this.updateUI();
                 this.closeAllModals();
                 this.loadUserChats();
                 this.showAlert("Login success!", "success");
+            } else {
+                this.showAlert(data.error, "error");
             }
-        } catch (e) {
+        } catch {
             this.showAlert("Network error", "error");
         }
-
-        btn.disabled = false;
-        btn.innerHTML = oldText;
     }
 
     async register() {
         const username = this.loginUsernameInput.value.trim();
         const password = this.loginPasswordInput.value;
 
-        if (username.length < 3)
-            return this.showAlert("Username must be 3+ chars", "error");
-        if (password.length < 6)
-            return this.showAlert("Password must be 6+ chars", "error");
-
-        const btn = this.registerBtn;
-        const oldText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Creating...`;
+        if (username.length < 3) return this.showAlert("Username must be 3+ chars", "error");
+        if (password.length < 6) return this.showAlert("Password must be 6+ chars", "error");
 
         try {
             const res = await fetch(`${this.baseURL}/api/auth/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password }),
             });
 
             const data = await res.json();
 
-            if (!data.success) {
-                this.showAlert(data.error, "error");
-            } else {
+            if (data.success) {
                 localStorage.setItem("noxy_token", data.token);
                 this.currentUser = data.user;
                 this.updateUI();
                 this.closeAllModals();
-                this.showAlert("Account created!", "success");
                 this.createNewChat();
+                this.showAlert("Account created!", "success");
+            } else {
+                this.showAlert(data.error, "error");
             }
-        } catch (e) {
+        } catch {
             this.showAlert("Network error", "error");
         }
-
-        btn.disabled = false;
-        btn.innerHTML = oldText;
     }
 
     logout() {
@@ -224,31 +183,29 @@ class NoxyApp {
 
     updateUI() {
         if (this.currentUser) {
-            this.userInfo.innerHTML = `
-                <div class="user-avatar">👤</div>
-                <div class="user-name">${this.currentUser.displayName}</div>
-            `;
             this.loginBtn.style.display = "none";
+            this.userInfo.innerHTML = `<div class="user-avatar">👤</div><div class="user-name">${this.currentUser.displayName}</div>`;
         } else {
-            this.userInfo.innerHTML = "";
             this.loginBtn.style.display = "block";
+            this.userInfo.innerHTML = "";
         }
     }
 
     /* ---------------------------------------------------
-       CHAT HANDLING
+       CHAT
     --------------------------------------------------- */
     createNewChat() {
-        const newChat = {
+        const chat = {
             id: Date.now().toString(),
             title: "New Chat",
-            messages: []
+            messages: [],
         };
 
-        this.chats.unshift(newChat);
+        this.currentChatId = chat.id;
+        this.chats.unshift(chat);
         this.saveToLocalStorage();
         this.renderChatHistory();
-        this.loadChat(newChat.id);
+        this.loadChat(chat.id);
     }
 
     renderChatHistory() {
@@ -258,8 +215,8 @@ class NoxyApp {
             const div = document.createElement("div");
             div.classList.add("chat-item");
             if (chat.id === this.currentChatId) div.classList.add("active");
-            div.innerText = chat.title;
 
+            div.textContent = chat.title;
             div.addEventListener("click", () => this.loadChat(chat.id));
 
             this.chatHistory.appendChild(div);
@@ -268,127 +225,128 @@ class NoxyApp {
 
     loadChat(chatId) {
         this.currentChatId = chatId;
+
         const chat = this.chats.find((c) => c.id === chatId);
         if (!chat) return;
 
-        this.currentChatTitle.innerText = chat.title;
+        this.currentChatTitle.textContent = chat.title;
         this.chatContainer.innerHTML = "";
 
-        chat.messages.forEach((msg) => this.addMessageToUI(msg));
-
+        chat.messages.forEach((m) => this.addMessageToUI(m));
         this.renderChatHistory();
     }
 
     /* ---------------------------------------------------
-       MESSAGE SENDING
+       SEND MESSAGE FIXED VERSION
     --------------------------------------------------- */
     async sendMessage() {
-        const text = this.messageInput.value.trim();
-        if (!text) return;
+        const message = this.messageInput?.value?.trim() || "";
 
-        if (!this.currentChatId) this.createNewChat();
+        if (!message) return this.showAlert("Please enter a message", "warning");
 
-        const chat = this.chats.find((c) => c.id === this.currentChatId);
+        if (!this.currentUser) {
+            this.openModal(this.loginModal);
+            return this.showAlert("Please login to send messages", "warning");
+        }
 
-        const message = {
-            role: "user",
-            content: text
-        };
+        const isNewChat = !this.currentChatId;
+        if (isNewChat) {
+            this.createNewChat();
+            await new Promise((r) => setTimeout(r, 80));
+        }
 
-        chat.messages.push(message);
-        this.addMessageToUI(message);
+        const userMsg = { role: "user", content: message };
+        this.addMessageToUI(userMsg);
+
         this.messageInput.value = "";
-        this.saveToLocalStorage();
 
-        // Send to AI API
-        this.sendToAI(text);
+        const loadingBubble = this.showLoadingMessage();
+
+        try {
+            const token = localStorage.getItem("noxy_token");
+
+            const res = await fetch(`${this.baseURL}/api/chat/message`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    chatId: this.currentChatId,
+                    message,
+                    newChat: isNewChat,
+                }),
+            });
+
+            const data = await res.json();
+            this.removeLoadingMessage(loadingBubble);
+
+            if (!data.success) throw new Error(data.error);
+
+            if (data.aiResponse) {
+                this.addMessageToUI({
+                    role: "assistant",
+                    content: data.aiResponse,
+                });
+            }
+
+            if (data.chat) {
+                const index = this.chats.findIndex((c) => c.id === data.chat.id);
+
+                if (index !== -1) {
+                    this.chats[index] = data.chat;
+                } else {
+                    this.chats.unshift(data.chat);
+                }
+
+                this.currentChatId = data.chat.id;
+
+                if (data.chat.title) {
+                    this.currentChatTitle.textContent = data.chat.title;
+                }
+
+                this.renderChatHistory();
+                this.saveToLocalStorage();
+            }
+        } catch (err) {
+            this.removeLoadingMessage(loadingBubble);
+
+            this.addMessageToUI({
+                role: "assistant",
+                content: `⚠ Error: ${err.message}`,
+            });
+
+            this.showAlert("Failed: " + err.message, "error");
+        }
     }
 
+    /* ---------------------------------------------------
+       MESSAGE UI
+    --------------------------------------------------- */
     addMessageToUI(msg) {
         const div = document.createElement("div");
         div.classList.add("message", msg.role);
 
-        div.innerHTML = `
-            <div class="msg-bubble">${msg.content}</div>
-        `;
-
+        div.innerHTML = `<div class="msg-bubble">${msg.content}</div>`;
         this.chatContainer.appendChild(div);
         this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     }
 
-    async sendToAI(text) {
-        const chat = this.chats.find((c) => c.id === this.currentChatId);
+    showLoadingMessage() {
+        const div = document.createElement("div");
+        div.classList.add("message", "assistant", "loading");
+        div.innerHTML = `<div class="msg-bubble"><i class="fas fa-spinner fa-spin"></i> Thinking...</div>`;
+        this.chatContainer.appendChild(div);
+        this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+        return div;
+    }
 
-        const loadingMsg = {
-            role: "assistant",
-            content: `<i class="fas fa-spinner fa-spin"></i> Noxy is thinking...`
-        };
-
-        this.addMessageToUI(loadingMsg);
-
-        try {
-            const res = await fetch(`${this.baseURL}/api/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    chatId: this.currentChatId,
-                    message: text
-                })
-            });
-
-            const data = await res.json();
-            if (!data.success) throw new Error();
-
-            chat.messages.pop();
-            const aiMsg = { role: "assistant", content: data.reply };
-
-            chat.messages.push(aiMsg);
-            this.saveToLocalStorage();
-
-            this.chatContainer.lastChild.remove();
-            this.addMessageToUI(aiMsg);
-        } catch (e) {
-            this.chatContainer.lastChild.remove();
-            this.addMessageToUI({
-                role: "assistant",
-                content: "⚠ Error: Unable to get response."
-            });
-        }
+    removeLoadingMessage(element) {
+        if (element && element.remove) element.remove();
     }
 
     /* ---------------------------------------------------
-       TIKTOK DOWNLOADER
-    --------------------------------------------------- */
-    async downloadTikTok() {
-        const url = this.tiktokUrlInput.value.trim();
-        if (!url) return this.showAlert("Enter TikTok URL");
-
-        this.downloadTikTokBtn.disabled = true;
-        this.downloadTikTokBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Loading...`;
-
-        try {
-            const res = await fetch(`${this.baseURL}/api/tiktok?url=${encodeURIComponent(url)}`);
-            const data = await res.json();
-
-            if (!data.success) throw new Error(data.error);
-
-            this.videoPreview.innerHTML = `<video src="${data.video}" controls></video>`;
-
-            this.downloadOptions.innerHTML = `
-                <a href="${data.video}" class="btn-primary" download>Download Video</a>
-            `;
-
-            this.tiktokResult.style.display = "block";
-        } catch (e) {
-            this.showAlert("Failed to fetch TikTok", "error");
-        }
-
-        this.downloadTikTokBtn.disabled = false;
-        this.downloadTikTokBtn.innerHTML = 'Download';
-    }
-
-    /* ---------------------------------------------------
-       ALERT SYSTEM
+       ALERTS
     --------------------------------------------------- */
     showAlert(text, type = "info") {
         const div = document.createElement("div");
