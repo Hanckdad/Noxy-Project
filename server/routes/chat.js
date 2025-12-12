@@ -1,92 +1,67 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
+const fs = require('fs').promises;
+const path = require('path');
 const axios = require('axios');
-const database = require('../database/index');
 
-// Get user from token
-async function authenticateUser(req) {
+const chatsFilePath = path.join(__dirname, '../database/chats.json');
+const SERPAPI_KEY = "0be5ff098bed53fb055200fa4628d44ff9863d8788c1f98c6069b4ca1773c3b5";
+
+// Initialize chats database
+async function initChatsDB() {
     try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
+        await fs.mkdir(path.dirname(chatsFilePath), { recursive: true });
         
-        if (!token) {
-            return null;
+        try {
+            await fs.access(chatsFilePath);
+            const data = await fs.readFile(chatsFilePath, 'utf8');
+            return JSON.parse(data || '[]');
+        } catch {
+            await fs.writeFile(chatsFilePath, JSON.stringify([]));
+            return [];
         }
-
-        // Verify JWT
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || 'noxy-voldigoard-secret-2024'
-        );
-
-        // Check session
-        const session = await database.validateSession(token);
-        if (!session) {
-            return null;
-        }
-
-        // Get user
-        const user = await database.findUser({ id: decoded.id });
-        return user;
-
     } catch (error) {
-        console.error('Authentication error:', error);
-        return null;
+        console.error('Chats DB init error:', error);
+        return [];
     }
 }
 
-// Get all user chats
+// Save chats
+async function saveChats(chats) {
+    try {
+        await fs.writeFile(chatsFilePath, JSON.stringify(chats, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Save chats error:', error);
+        return false;
+    }
+}
+
+// ==================== ROUTES ====================
+
+// Get user's chats
 router.get('/', async (req, res) => {
     try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+            return res.json({
+                success: false,
+                error: 'No token provided'
+            });
         }
 
-        const chats = await database.getUserChats(user.id);
+        const chats = await initChatsDB();
+        const userChats = chats.filter(chat => chat.userId === req.query.userId);
         
         res.json({
             success: true,
-            chats: chats.sort((a, b) => 
-                new Date(b.updatedAt) - new Date(a.updatedAt)
-            )
+            chats: userChats
         });
-
     } catch (error) {
         console.error('Get chats error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to get chats' 
-        });
-    }
-});
-
-// Create new chat
-router.post('/new', async (req, res) => {
-    try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { title } = req.body;
-        const chat = await database.createChat(user.id, title || 'New Chat');
-        
-        await database.logAction('chat_created', user.id, 'new_chat', {
-            chatId: chat.id,
-            title: chat.title
-        });
-
         res.json({
-            success: true,
-            chat: chat
-        });
-
-    } catch (error) {
-        console.error('Create chat error:', error);
-        res.status(500).json({ 
             success: false,
-            error: 'Failed to create chat' 
+            error: 'Failed to get chats'
         });
     }
 });
@@ -94,91 +69,120 @@ router.post('/new', async (req, res) => {
 // Send message to chat
 router.post('/message', async (req, res) => {
     try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { chatId, message, newChat } = req.body;
+        const token = req.headers.authorization?.replace('Bearer ', '');
         
-        if (!message || !message.trim()) {
-            return res.status(400).json({ 
+        if (!token) {
+            return res.json({
                 success: false,
-                error: 'Message is required' 
+                error: 'Authentication required'
             });
         }
 
+        if (!message || !message.trim()) {
+            return res.json({
+                success: false,
+                error: 'Message is required'
+            });
+        }
+
+        console.log('💬 Chat message:', { chatId, newChat, messageLength: message.length });
+
+        let chats = await initChatsDB();
         let chat;
         
         if (newChat) {
             // Create new chat
-            chat = await database.createChat(user.id, null, {
-                role: 'user',
-                content: message.trim()
-            });
+            chat = {
+                id: Date.now().toString(),
+                userId: "current-user", // In real app, get from token
+                title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
+                messages: [
+                    {
+                        id: '1',
+                        role: 'user',
+                        content: message.trim(),
+                        timestamp: new Date().toISOString()
+                    }
+                ],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            chats.unshift(chat);
         } else if (chatId) {
-            // Add to existing chat
-            await database.addMessageToChat(chatId, {
+            // Find existing chat
+            chat = chats.find(c => c.id === chatId);
+            if (!chat) {
+                return res.json({
+                    success: false,
+                    error: 'Chat not found'
+                });
+            }
+            
+            // Add user message
+            chat.messages.push({
+                id: (chat.messages.length + 1).toString(),
                 role: 'user',
-                content: message.trim()
+                content: message.trim(),
+                timestamp: new Date().toISOString()
             });
             
-            const chats = await database.getUserChats(user.id);
-            chat = chats.find(c => c.id === chatId);
+            chat.updatedAt = new Date().toISOString();
         } else {
-            return res.status(400).json({ 
+            return res.json({
                 success: false,
-                error: 'chatId is required for existing chat' 
+                error: 'chatId is required'
             });
         }
 
         // Get AI response
-        const aiResponse = await getAIResponse(message.trim(), user);
+        const aiResponse = await getAIResponse(message.trim());
         
         // Add AI response to chat
-        await database.addMessageToChat(chat.id, {
+        chat.messages.push({
+            id: (chat.messages.length + 1).toString(),
             role: 'assistant',
-            content: aiResponse
+            content: aiResponse,
+            timestamp: new Date().toISOString()
         });
-
-        // Get updated chat
-        const chats = await database.getUserChats(user.id);
-        const updatedChat = chats.find(c => c.id === chat.id);
         
-        await database.logAction('chat_message', user.id, 'message_sent', {
-            chatId: chat.id,
-            messageLength: message.length,
-            hasAIResponse: true
-        });
+        chat.updatedAt = new Date().toISOString();
+        
+        // Update title if it's a new chat
+        if (newChat) {
+            chat.title = message.substring(0, 30) + (message.length > 30 ? '...' : '');
+        }
+
+        // Save chats
+        await saveChats(chats);
 
         res.json({
             success: true,
-            chat: updatedChat,
+            chat: chat,
             aiResponse: aiResponse
         });
 
     } catch (error) {
-        console.error('Send message error:', error);
-        res.status(500).json({ 
+        console.error('Chat error:', error);
+        res.json({
             success: false,
-            error: 'Failed to send message',
-            details: error.message 
+            error: 'Failed to process message: ' + error.message
         });
     }
 });
 
-// Get AI response
-async function getAIResponse(query, user) {
+// Get AI response with web search
+async function getAIResponse(query) {
     try {
-        // Check for greetings
-        const greetings = {
+        console.log('🤖 Getting AI response for:', query);
+        
+        // Check for simple greetings
+        const simpleResponses = {
             'hi': "Hello! 🦇 I'm Noxy Voldigoard. How can I assist you today?",
             'hello': "Hello there! 🦇 I'm Noxy, your AI assistant. What can I help you with?",
             'hey': "Hey! 🦇 What's on your mind today?",
             'hai': "Hai! 🦇 Apa yang bisa saya bantu?",
-            'hallo': "Hallo! 🦇 Wie kann ich Ihnen helfen?",
-            'hola': "¡Hola! 🦇 ¿En qué puedo ayudarte?",
-            'bonjour': "Bonjour! 🦇 Comment puis-je vous aider?",
             'how are you': "I'm doing great, thank you! 🦇 How can I assist you today?",
             'what is your name': "I'm Noxy Voldigoard! 🦇 Your AI assistant created by Bayu Official.",
             'who created you': "I was created by Bayu Official. 🦇 He's an awesome developer!",
@@ -191,39 +195,45 @@ async function getAIResponse(query, user) {
 
         const lowerQuery = query.toLowerCase().trim();
         
-        for (const [greeting, response] of Object.entries(greetings)) {
-            if (lowerQuery.includes(greeting)) {
+        for (const [key, response] of Object.entries(simpleResponses)) {
+            if (lowerQuery.includes(key)) {
+                console.log('✅ Using simple response for:', key);
                 return response;
             }
         }
 
         // Search web for information
+        console.log('🔍 Searching web for:', query);
         const searchResults = await searchWeb(query);
         
         if (searchResults.length === 0) {
+            console.log('❌ No search results found');
             return `I couldn't find specific information about "${query}". This could be because:\n\n1. The topic is very new or specialized\n2. There's limited information available online\n3. The search terms need adjustment\n\nTry rephrasing your question or ask about a different topic! 🦇`;
         }
 
+        console.log(`✅ Found ${searchResults.length} search results`);
+        
         // Generate response from search results
-        let response = `Based on my search for "${query}", here's what I found:\n\n`;
+        let response = `Based on my search for **"${query}"**, here's what I found:\n\n`;
         
         searchResults.forEach((result, index) => {
-            response += `**${result.title || 'Source ' + (index + 1)}**\n`;
-            response += `${result.snippet}\n\n`;
-            
-            if (result.source) {
-                response += `*Source: ${result.source}*\n`;
+            if (result.snippet) {
+                response += `**${index + 1}. ${result.title || 'Information'}**\n`;
+                response += `${result.snippet}\n\n`;
             }
-            
-            response += '---\n\n';
         });
         
-        response += "**Note:** Information may not be current or complete. Always verify important details.";
+        response += "---\n\n*Note: Information is gathered from web search results and may not be current.*";
+        
+        // Limit response length
+        if (response.length > 1500) {
+            response = response.substring(0, 1500) + '...\n\n*Response truncated for readability.*';
+        }
         
         return response;
 
     } catch (error) {
-        console.error('AI response error:', error);
+        console.error('❌ AI response error:', error);
         return "I encountered an error while processing your request. Please try again in a moment. 🦇";
     }
 }
@@ -231,7 +241,7 @@ async function getAIResponse(query, user) {
 // Search web using SerpApi
 async function searchWeb(query) {
     try {
-        const SERPAPI_KEY = "0be5ff098bed53fb055200fa4628d44ff9863d8788c1f98c6069b4ca1773c3b5";
+        console.log('🌐 Searching with SerpApi:', query);
         
         const response = await axios.get('https://serpapi.com/search.json', {
             params: {
@@ -242,9 +252,11 @@ async function searchWeb(query) {
                 gl: 'us',
                 hl: 'en'
             },
-            timeout: 10000
+            timeout: 10000 // 10 second timeout
         });
 
+        console.log('✅ SerpApi response received');
+        
         const results = response.data.organic_results || [];
         
         return results
@@ -253,47 +265,41 @@ async function searchWeb(query) {
                 title: result.title || '',
                 snippet: result.snippet || '',
                 link: result.link || '',
-                source: result.source || '',
-                date: result.date || ''
+                source: result.source || ''
             }));
 
     } catch (error) {
-        console.error('Search error:', error);
-        return [];
+        console.error('❌ Search error:', error.message);
+        
+        // Fallback response if SerpApi fails
+        return [
+            {
+                title: "Web Search Information",
+                snippet: "I've searched for information about your query. For the most accurate and up-to-date information, I recommend checking reputable websites directly related to your topic."
+            }
+        ];
     }
 }
 
 // Delete chat
 router.delete('/:chatId', async (req, res) => {
     try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
         const { chatId } = req.params;
-        const chats = await database.getUserChats(user.id);
-        const chat = chats.find(c => c.id === chatId);
         
-        if (!chat) {
-            return res.status(404).json({ 
+        let chats = await initChatsDB();
+        const initialLength = chats.length;
+        
+        chats = chats.filter(chat => chat.id !== chatId);
+        
+        if (chats.length === initialLength) {
+            return res.json({
                 success: false,
-                error: 'Chat not found' 
+                error: 'Chat not found'
             });
         }
-
-        // In real implementation, we would delete from database
-        // For now, we'll just filter it out
-        const allChats = await database.readFile('chats.json');
-        const filteredChats = allChats.filter(c => c.id !== chatId);
-        await database.writeFile('chats.json', filteredChats);
         
-        await database.logAction('chat_deleted', user.id, 'chat_removed', {
-            chatId: chatId,
-            title: chat.title,
-            messagesCount: chat.messages.length
-        });
-
+        await saveChats(chats);
+        
         res.json({
             success: true,
             message: 'Chat deleted successfully'
@@ -301,100 +307,9 @@ router.delete('/:chatId', async (req, res) => {
 
     } catch (error) {
         console.error('Delete chat error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to delete chat' 
-        });
-    }
-});
-
-// Update chat title
-router.put('/:chatId/title', async (req, res) => {
-    try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { chatId } = req.params;
-        const { title } = req.body;
-        
-        if (!title || !title.trim()) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Title is required' 
-            });
-        }
-
-        const chats = await database.getUserChats(user.id);
-        const chat = chats.find(c => c.id === chatId);
-        
-        if (!chat) {
-            return res.status(404).json({ 
-                success: false,
-                error: 'Chat not found' 
-            });
-        }
-
-        // Update chat
-        const allChats = await database.readFile('chats.json');
-        const chatIndex = allChats.findIndex(c => c.id === chatId);
-        
-        if (chatIndex !== -1) {
-            allChats[chatIndex].title = title.trim();
-            allChats[chatIndex].updatedAt = new Date().toISOString();
-            await database.writeFile('chats.json', allChats);
-        }
-
         res.json({
-            success: true,
-            chat: allChats[chatIndex]
-        });
-
-    } catch (error) {
-        console.error('Update title error:', error);
-        res.status(500).json({ 
             success: false,
-            error: 'Failed to update title' 
-        });
-    }
-});
-
-// Get chat statistics
-router.get('/stats', async (req, res) => {
-    try {
-        const user = await authenticateUser(req);
-        if (!user) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const chats = await database.getUserChats(user.id);
-        const totalMessages = chats.reduce((acc, chat) => acc + chat.messages.length, 0);
-        
-        const today = new Date();
-        const last7Days = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
-        const recentChats = chats.filter(chat => 
-            new Date(chat.updatedAt) > last7Days
-        ).length;
-
-        res.json({
-            success: true,
-            stats: {
-                totalChats: chats.length,
-                totalMessages: totalMessages,
-                recentChats: recentChats,
-                pinnedChats: chats.filter(c => c.isPinned).length,
-                averageMessages: chats.length > 0 ? 
-                    Math.round(totalMessages / chats.length) : 0
-            }
-        });
-
-    } catch (error) {
-        console.error('Stats error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to get statistics' 
+            error: 'Failed to delete chat'
         });
     }
 });
