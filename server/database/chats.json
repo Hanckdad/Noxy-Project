@@ -1,0 +1,48 @@
+[
+  {
+    "id": "1736937941001",
+    "userId": "1736937940168",
+    "title": "Tentang Noxy AI",
+    "messages": [
+      {
+        "id": "msg_001",
+        "role": "user",
+        "content": "Apa itu Noxy Voldigoard?",
+        "timestamp": "2024-01-15T10:30:00.000Z"
+      },
+      {
+        "id": "msg_002",
+        "role": "assistant",
+        "content": "Noxy Voldigoard adalah AI assistant yang dibuat oleh Bayu Official. 🦇 Saya bisa membantu dengan:\n1. Mencari informasi dari web\n2. Menjawab pertanyaan\n3. Download video TikTok\n4. Membuat ringkasan\n\nSaya menggunakan SerpApi untuk search real-time dan bisa mengakses informasi terkini.",
+        "timestamp": "2024-01-15T10:30:30.000Z"
+      }
+    ],
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:30.000Z",
+    "isPinned": true,
+    "tags": ["introduction", "ai"]
+  },
+  {
+    "id": "1736937941002",
+    "userId": "1736937940168",
+    "title": "Cara download TikTok",
+    "messages": [
+      {
+        "id": "msg_003",
+        "role": "user",
+        "content": "Bagaimana cara download video TikTok tanpa watermark?",
+        "timestamp": "2024-01-16T14:20:00.000Z"
+      },
+      {
+        "id": "msg_004",
+        "role": "assistant",
+        "content": "Untuk download TikTok tanpa watermark:\n1. Buka modal TikTok downloader (ikon TikTok di header)\n2. Paste URL video TikTok\n3. Klik Download\n4. Pilih opsi \"No Watermark\"\n\nSaya menggunakan API publik TikWM yang menyediakan video HD tanpa watermark. Fitur ini gratis dan tidak butuh login TikTok.",
+        "timestamp": "2024-01-16T14:20:45.000Z"
+      }
+    ],
+    "createdAt": "2024-01-16T14:20:00.000Z",
+    "updatedAt": "2024-01-16T14:20:45.000Z",
+    "isPinned": false,
+    "tags": ["tiktok", "tutorial"]
+  }
+]
