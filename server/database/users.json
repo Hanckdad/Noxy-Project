@@ -2,35 +2,25 @@
   {
     "id": "1",
     "username": "admin",
-    "email": "admin@noxy.ai",
-    "password": "$2a$10$XVRrP0R7pTa.zrXH07E3fuK6.8M9K4LWqP2GdU5wV8JYlL1M2N3O4P",
-    "displayName": "System Admin",
+    "password": "admin1nolep",
+    "displayName": "Administrator",
     "role": "admin",
     "avatarColor": "#2563eb",
     "createdAt": "2024-01-15T08:00:00.000Z",
-    "updatedAt": "2024-01-15T08:00:00.000Z",
-    "lastLogin": null,
     "settings": {
-      "theme": "light",
-      "language": "en",
-      "notifications": true
+      "theme": "light"
     }
   },
   {
     "id": "2",
     "username": "bayu",
-    "email": "bayu@official.com",
-    "password": "$2a$10$YVRrP0R7pTa.zrXH07E3fuK6.8M9K4LWqP2GdU5wV8JYlL1M2N3O4P",
+    "password": "bayu1hengker",
     "displayName": "Bayu Official",
     "role": "creator",
     "avatarColor": "#dc2626",
     "createdAt": "2024-01-01T10:30:00.000Z",
-    "updatedAt": "2024-01-20T14:45:00.000Z",
-    "lastLogin": "2024-01-20T14:45:00.000Z",
     "settings": {
-      "theme": "dark",
-      "language": "id",
-      "notifications": true
+      "theme": "dark"
     }
   }
 ]
