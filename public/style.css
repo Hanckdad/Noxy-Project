@@ -1358,3 +1358,96 @@ button:disabled {
     border-radius: 8px;
     border: 1px solid var(--border);
 }
+
+/* Quick Login Styles */
+.quick-login {
+    margin: 20px 0;
+    padding: 15px;
+    background: var(--sidebar-bg);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.quick-login p {
+    margin-bottom: 10px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.quick-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.quick-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.quick-btn.admin {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+}
+
+.quick-btn.creator {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+}
+
+.quick-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Auth Buttons Container */
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.auth-buttons .btn-primary,
+.auth-buttons .btn-secondary {
+    flex: 1;
+    padding: 12px;
+}
+
+/* Simple Form Styling */
+#loginModal .modal-body {
+    padding: 20px;
+}
+
+#loginModal .form-group {
+    margin-bottom: 20px;
+}
+
+#loginModal .form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+#loginModal .form-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border 0.2s;
+}
+
+#loginModal .form-group input:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
