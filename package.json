@@ -1,11 +1,13 @@
 {
   "name": "noxy-voldigoard",
   "version": "1.0.0",
-  "description": "Web App AI - Noxy Voldigoard",
+  "description": "Web App AI - Noxy Voldigoard by Bayu Official",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
+    "dev": "nodemon server/index.js",
+    "vercel-build": "echo 'Building for Vercel...'",
+    "build": "echo 'Build completed'"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -20,5 +22,17 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  }
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "ai",
+    "chatbot",
+    "tiktok-downloader",
+    "web-search",
+    "assistant"
+  ],
+  "author": "Bayu Official",
+  "license": "MIT"
 }
