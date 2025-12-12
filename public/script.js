@@ -1,240 +1,328 @@
-// GANTI SEMUA AUTH METHODS DI DALAM CLASS NoxyApp:
+// ====================== AUTH METHODS NEW VERSION ======================
 
-// Authentication Methods - FIXED VERSION
+// CHECK TOKEN
 async checkAuth() {
-    const token = localStorage.getItem('token');
-    if (token) {
-        try {
-            const response = await fetch(`${this.baseURL}/api/auth/verify`, {
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.currentUser = data.user;
-                this.updateUserUI();
-                await this.loadUserChats();
-                return true;
-            } else {
-                // Token invalid, remove it
-                localStorage.removeItem('token');
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
-            localStorage.removeItem('token');
-        }
+    console.log('🔍 Checking authentication...');
+    const token = localStorage.getItem('noxy_token');
+    
+    if (!token) {
+        console.log('❌ No token found');
+        this.currentUser = null;
+        this.updateUserUI();
+        return false;
     }
     
-    // Not logged in
-    this.currentUser = null;
-    this.updateUserUI();
-    return false;
+    try {
+        const response = await fetch(`${this.baseURL}/api/auth/verify`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            console.log('✅ User authenticated:', data.user.username);
+            this.currentUser = data.user;
+            this.updateUserUI();
+            await this.loadUserChats();
+            return true;
+        } else {
+            console.log('❌ Token invalid:', data.error);
+            localStorage.removeItem('noxy_token');
+            this.currentUser = null;
+            this.updateUserUI();
+            return false;
+        }
+    } catch (error) {
+        console.error('⚠️ Auth check error:', error);
+        localStorage.removeItem('noxy_token');
+        this.currentUser = null;
+        this.updateUserUI();
+        return false;
+    }
 }
 
-async login() {
-    const username = this.usernameInput.value.trim();
-    const password = this.passwordInput.value;
-
+// LOGIN
+async handleLogin() {
+    const username = this.loginUsernameInput.value.trim();
+    const password = this.loginPasswordInput.value.trim();
+    
     if (!username || !password) {
-        this.showAlert('Please enter username and password', 'error');
+        this.showAlert('Please enter both username and password', 'error');
         return;
     }
-
+    
+    this.loginSubmitBtn.disabled = true;
+    this.loginSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+    
     try {
-        this.loginSubmitBtn.disabled = true;
-        this.loginSubmitBtn.textContent = 'Logging in...';
-
         const response = await fetch(`${this.baseURL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-
+        
         const data = await response.json();
         
-        if (data.success) {
-            // Save token
-            localStorage.setItem('token', data.token);
-            
-            // Set current user
+        if (data.success && data.token) {
+            localStorage.setItem('noxy_token', data.token);
             this.currentUser = data.user;
+
             this.updateUserUI();
-            
-            // Close modal
             this.closeAllModals();
-            
-            // Load user chats
+
+            this.loginUsernameInput.value = '';
+            this.loginPasswordInput.value = '';
+
             await this.loadUserChats();
-            
-            // Show success message
+
             this.showAlert(`Welcome back, ${data.user.displayName}! 🦇`, 'success');
-            
-            // Clear form
-            this.usernameInput.value = '';
-            this.passwordInput.value = '';
+
+            if (this.chats.length > 0) {
+                this.loadChat(this.chats[0].id);
+            } else {
+                this.createNewChat();
+            }
+
+            console.log('✅ Login successful');
+
         } else {
-            this.showAlert(data.error || 'Login failed', 'error');
+            this.showAlert(data.error || 'Login failed. Please check your credentials.', 'error');
         }
     } catch (error) {
-        console.error('Login error:', error);
-        this.showAlert('Network error. Please try again.', 'error');
+        console.error('⚠️ Login error:', error);
+        this.showAlert('Network error. Please check your connection.', 'error');
     } finally {
         this.loginSubmitBtn.disabled = false;
-        this.loginSubmitBtn.textContent = 'Login';
+        this.loginSubmitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login Now';
     }
 }
 
-async register() {
-    const username = this.usernameInput.value.trim();
-    const password = this.passwordInput.value;
-
+// REGISTER
+async handleRegister() {
+    const username = this.registerUsernameInput.value.trim();
+    const password = this.registerPasswordInput.value.trim();
+    const email = this.registerEmailInput.value.trim() || `${username}@noxy.ai`;
+    
     if (!username || !password) {
-        this.showAlert('Please enter username and password', 'error');
+        this.showAlert('Username and password are required', 'error');
         return;
     }
-
     if (username.length < 3) {
         this.showAlert('Username must be at least 3 characters', 'error');
         return;
     }
-
     if (password.length < 6) {
         this.showAlert('Password must be at least 6 characters', 'error');
         return;
     }
-
+    
+    this.registerSubmitBtn.disabled = true;
+    this.registerSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+    
     try {
-        this.registerBtn.disabled = true;
-        this.registerBtn.textContent = 'Creating account...';
-
         const response = await fetch(`${this.baseURL}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, email })
         });
-
+        
         const data = await response.json();
         
-        if (data.success) {
-            // Save token
-            localStorage.setItem('token', data.token);
-            
-            // Set current user
+        if (data.success && data.token) {
+            localStorage.setItem('noxy_token', data.token);
+
             this.currentUser = data.user;
             this.updateUserUI();
-            
-            // Close modal
             this.closeAllModals();
-            
-            // Clear form
-            this.usernameInput.value = '';
-            this.passwordInput.value = '';
-            
-            // Show success message
-            this.showAlert(`Account created successfully! Welcome, ${data.user.displayName}! 🎉`, 'success');
-            
-            // Create welcome chat
-            setTimeout(() => {
-                this.createNewChat();
-            }, 1000);
+
+            this.registerUsernameInput.value = '';
+            this.registerPasswordInput.value = '';
+            this.registerEmailInput.value = '';
+
+            this.showAlert(`Account created! Welcome, ${data.user.displayName}! 🎉`, 'success');
+
+            setTimeout(() => this.createNewChat(), 500);
+
+            console.log('✅ Registration success');
         } else {
-            this.showAlert(data.error || 'Registration failed', 'error');
+            this.showAlert(data.error || 'Registration failed.', 'error');
         }
     } catch (error) {
-        console.error('Registration error:', error);
+        console.error('⚠️ Register error:', error);
         this.showAlert('Network error. Please try again.', 'error');
     } finally {
-        this.registerBtn.disabled = false;
-        this.registerBtn.textContent = 'Create Account';
+        this.registerSubmitBtn.disabled = false;
+        this.registerSubmitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
     }
 }
 
+// DEMO ACCOUNT
+useDemoAccount(username, password) {
+    this.switchAuthTab('login');
+    this.loginUsernameInput.value = username;
+    this.loginPasswordInput.value = password;
+    this.loginPasswordInput.focus();
+    this.showAlert(`Demo account loaded! Click "Login Now"`, 'info');
+}
+
+// REGISTER VALIDATOR
+validateRegisterForm() {
+    const username = this.registerUsernameInput.value.trim();
+    const password = this.registerPasswordInput.value.trim();
+
+    if (username.length > 0) {
+        if (username.length < 3) {
+            this.usernameHint.textContent = '❌ Min 3 characters';
+            this.usernameHint.className = 'form-hint invalid';
+        } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            this.usernameHint.textContent = '❌ Only letters, numbers, _';
+            this.usernameHint.className = 'form-hint invalid';
+        } else {
+            this.usernameHint.textContent = '✅ Good';
+            this.usernameHint.className = 'form-hint valid';
+        }
+    } else {
+        this.usernameHint.textContent = '';
+        this.usernameHint.className = 'form-hint';
+    }
+
+    if (password.length > 0) {
+        if (password.length < 6) {
+            this.passwordHint.textContent = '❌ Min 6 chars';
+            this.passwordHint.className = 'form-hint invalid';
+        } else {
+            this.passwordHint.textContent = '✅ Strong';
+            this.passwordHint.className = 'form-hint valid';
+        }
+    } else {
+        this.passwordHint.textContent = '';
+        this.passwordHint.className = 'form-hint';
+    }
+}
+
+// SWITCH TABS
+switchAuthTab(tab) {
+    this.loginTabBtn.classList.toggle('active', tab === 'login');
+    this.registerTabBtn.classList.toggle('active', tab === 'register');
+
+    this.loginForm.classList.toggle('active', tab === 'login');
+    this.registerForm.classList.toggle('active', tab === 'register');
+
+    this.usernameHint.textContent = '';
+    this.passwordHint.textContent = '';
+    this.usernameHint.className = 'form-hint';
+    this.passwordHint.className = 'form-hint';
+
+    if (tab === 'login') {
+        this.registerUsernameInput.value = '';
+        this.registerPasswordInput.value = '';
+        this.registerEmailInput.value = '';
+    }
+}
+
+// LOGOUT
 logout() {
-    localStorage.removeItem('token');
+    console.log('👋 Logging out...');
+    localStorage.removeItem('noxy_token');
+
     this.currentUser = null;
     this.chats = [];
     this.currentChatId = null;
+
     this.updateUserUI();
     this.closeAllModals();
     this.clearChatUI();
-    
-    // Show welcome screen
+
     this.chatContainer.innerHTML = `
         <div class="welcome-message">
             <div class="welcome-icon">🦇</div>
             <h2>Hello, I'm Noxy Voldigoard</h2>
-            <p>How can I assist you today? Ask me anything!</p>
+            <p>Your AI assistant with web search capabilities</p>
+            <button class="btn-primary" id="getStartedBtn">
+                <i class="fas fa-rocket"></i> Get Started
+            </button>
         </div>
     `;
-    
-    // Show login modal
-    setTimeout(() => {
+
+    document.getElementById('getStartedBtn')?.addEventListener('click', () => {
         this.showModal(this.loginModal);
-    }, 500);
-    
+    });
+
     this.showAlert('Logged out successfully', 'success');
 }
 
-// Add this helper method to show alerts
-showAlert(message, type = 'info') {
-    // Remove existing alerts
-    const existingAlert = document.querySelector('.alert-message');
-    if (existingAlert) {
-        existingAlert.remove();
-    }
-    
-    // Create alert element
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert-message alert-${type}`;
-    alertDiv.innerHTML = `
-        <span>${message}</span>
-        <button class="alert-close">&times;</button>
-    `;
-    
-    // Add to body
-    document.body.appendChild(alertDiv);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 5000);
-    
-    // Close button
-    alertDiv.querySelector('.alert-close').addEventListener('click', () => {
-        alertDiv.remove();
-    });
-}
-
-// Update the updateUserUI method
+// UPDATE USER INFO UI
 updateUserUI() {
+    const userInfo = document.getElementById('userInfo');
+    const loginBtn = document.getElementById('loginBtn');
+    
     if (this.currentUser) {
         const initials = this.currentUser.username.substring(0, 2).toUpperCase();
-        this.userInfo.innerHTML = `
+
+        userInfo.innerHTML = `
             <div class="avatar" style="background-color: ${this.currentUser.avatarColor || '#2563eb'}">
                 ${initials}
             </div>
             <div class="user-details">
-                <h4>${this.currentUser.displayName || this.currentUser.username}</h4>
+                <h4>${this.currentUser.displayName}</h4>
                 <p>${this.currentUser.role || 'User'}</p>
             </div>
+            <div class="user-actions">
+                <button class="logout-btn" id="userLogoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
         `;
-        this.loginBtn.style.display = 'none';
+
+        loginBtn.style.display = 'none';
+
+        document.getElementById('userLogoutBtn')?.addEventListener('click', () => this.logout());
     } else {
-        this.userInfo.innerHTML = `
-            <div class="avatar" style="background-color: #6b7280">
-                ?
+        userInfo.innerHTML = `
+            <div class="avatar" style="background-color:#6b7280">
+                <i class="fas fa-user"></i>
             </div>
             <div class="user-details">
-                <h4>Guest</h4>
+                <h4>Guest User</h4>
                 <p>Not logged in</p>
             </div>
         `;
-        this.loginBtn.style.display = 'flex';
+
+        loginBtn.style.display = 'flex';
+        loginBtn.onclick = () => this.showModal(this.loginModal);
     }
+}
+
+// NICE ALERT
+showAlert(message, type = 'info') {
+    const old = document.querySelector('.alert-message');
+    if (old) old.remove();
+
+    const alert = document.createElement('div');
+    alert.className = `alert-message alert-${type}`;
+
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+
+    alert.innerHTML = `
+        <div class="alert-content">
+            <span class="alert-icon">${icons[type] || 'ℹ️'}</span>
+            <span class="alert-text">${message}</span>
+        </div>
+        <button class="alert-close"><i class="fas fa-times"></i></button>
+    `;
+
+    document.body.appendChild(alert);
+
+    setTimeout(() => alert.remove(), 5000);
+
+    alert.querySelector('.alert-close').addEventListener('click', () => alert.remove());
 }
