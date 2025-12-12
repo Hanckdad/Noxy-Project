@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noxy Voldigoard 🦇 - AI Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦇</text></svg>">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">🦇</span>
+                <h1>Noxy</h1>
+            </div>
+            <button class="new-chat-btn" id="newChatBtn">
+                <i class="fas fa-plus"></i> New Chat
+            </button>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <!-- Chat history akan diisi oleh JavaScript -->
+        </div>
+
+        <div class="user-section">
+            <div class="user-info" id="userInfo">
+                <!-- User info akan diisi setelah login -->
+            </div>
+            <div class="login-btn" id="loginBtn">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="header-left">
+                <h2 id="currentChatTitle">New Chat</h2>
+            </div>
+            <div class="header-right">
+                <button class="header-btn" id="tiktokDownloadBtn" title="TikTok Downloader">
+                    <i class="fab fa-tiktok"></i>
+                </button>
+                <button class="header-btn" id="settingsBtn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chatContainer">
+            <!-- Messages will appear here -->
+            <div class="welcome-message">
+                <div class="welcome-icon">🦇</div>
+                <h2>Hello, I'm Noxy Voldigoard</h2>
+                <p>How can I assist you today? Ask me anything!</p>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <button class="input-action-btn" id="attachBtn" title="Attach File">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="text" 
+                       id="messageInput" 
+                       placeholder="Message Noxy..." 
+                       autocomplete="off">
+                <button class="send-btn" id="sendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <p class="disclaimer">
+                Noxy can make mistakes. Consider checking important information.
+            </p>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Login / Register</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password">
+                </div>
+                <button class="btn-primary" id="loginSubmitBtn">Login</button>
+                <button class="btn-secondary" id="registerBtn">Create Account</button>
+                <p class="form-note">Accounts are saved locally for privacy.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="tiktokModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fab fa-tiktok"></i> TikTok Downloader</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="tiktokUrl">TikTok URL</label>
+                    <input type="text" id="tiktokUrl" placeholder="https://www.tiktok.com/@user/video/123">
+                </div>
+                <button class="btn-primary" id="downloadTikTokBtn">Download</button>
+                <div class="result-container" id="tiktokResult" style="display: none;">
+                    <div class="video-preview" id="videoPreview"></div>
+                    <div class="download-options" id="downloadOptions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog"></i> Settings</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>About Noxy Voldigoard</h4>
+                    <p><strong>Version:</strong> 1.0.0</p>
+                    <p><strong>Author:</strong> Bayu Official</p>
+                    <p><strong>Description:</strong> AI Assistant with web search capabilities</p>
+                </div>
+                <div class="settings-section">
+                    <h4>Features</h4>
+                    <ul class="features-list">
+                        <li><i class="fas fa-check"></i> AI Chat with Web Search</li>
+                        <li><i class="fas fa-check"></i> Multiple Chat Sessions</li>
+                        <li><i class="fas fa-check"></i> User Authentication</li>
+                        <li><i class="fas fa-check"></i> TikTok Downloader</li>
+                    </ul>
+                </div>
+                <button class="btn-danger" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
